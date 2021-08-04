@@ -21,7 +21,7 @@ Alternatively, you can just pull the image with `docker pull wbonelli/herbarium-
 To analyze an image:
 
 ```bash
-docker run wbonelli/herbarium-sheets python3.8 /opt/code/cli.py traits <input file>
+docker run wbonelli/herbarium-sheets python3.8 /opt/code/cli.py <input file>
 ```
 
 By default, output files will be written to the current working directory. To specify a different output location, use `-o <full path to output directory>`.
