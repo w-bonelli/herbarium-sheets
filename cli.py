@@ -7,6 +7,7 @@ import cv2
 import imageio
 import numpy as np
 import skimage
+from skimage.morphology import medial_axis, skeletonize
 
 import thresholding
 from options import AnalysisOptions
@@ -53,14 +54,19 @@ def process(options: AnalysisOptions) -> AnalysisResult:
 
     # dilate image
     print(f"Dilating")
-    kernel = np.ones((5, 5), np.uint8)
+    kernel = np.ones((options.kernel_size, options.kernel_size), np.uint8)
     dilated_image = cv2.dilate(inverted_image, kernel, iterations=1)
     cv2.imwrite(f"{output_prefix}.dilated.png", dilated_image)
 
+    # erode image
+    # print(f"Eroding")
+    # eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
+    # cv2.imwrite(f"{output_prefix}.eroded.png", eroded_image)
+
     # close image
-    print(f"Closing")
-    closed_image = cv2.morphologyEx(inverted_image, cv2.MORPH_CLOSE, kernel)
-    cv2.imwrite(f"{output_prefix}.closed.png", closed_image)
+    # print(f"Closing")
+    # closed_image = cv2.morphologyEx(inverted_image, cv2.MORPH_CLOSE, kernel)
+    # cv2.imwrite(f"{output_prefix}.closed.png", closed_image)
 
     # component labeling
     print(f"Finding connected components")
@@ -73,7 +79,7 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     labeled_img[label_hue == 0] = 0
     cv2.imwrite(f"{output_prefix}.labeled.png", labeled_img)
 
-    # select largest component
+    # select largest component as plant
     sizes = stats[:, -1]
     max_label = 1
     max_size = sizes[1]
@@ -85,13 +91,37 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     largest_comp_image[labels_image == max_label] = 255
     cv2.imwrite(f"{output_prefix}.largest.png", largest_comp_image)
 
+    # get medial axis
+    largest_comp_image[labels_image == max_label] = 1
+    medial_image, distance = medial_axis(largest_comp_image, return_distance=True)
+    cv2.imwrite(f"{output_prefix}.medial.png", skimage.img_as_uint(medial_image))
+
+    # get skeleton (Lee 94)
+    skeleton_image = skeletonize(largest_comp_image)
+    cv2.imwrite(f"{output_prefix}.skeleton.png", skimage.img_as_uint(skeleton_image))
+
+    # find area, length, max height/width
+    area = stats[max_label, cv2.CC_STAT_AREA]
+    width = stats[max_label, cv2.CC_STAT_WIDTH]
+    height = stats[max_label, cv2.CC_STAT_HEIGHT]
+    length = int(np.sum(skeleton_image == 1))
+
+    # print and return results
+    print(f"Area: {area}")
+    print(f"Width: {width}")
+    print(f"Height: {height}")
+    print(f"Length: {length}")
+    return AnalysisResult(name=options.input_name, area=area, width=width, height=height, length=length)
+
 
 @click.command()
 @click.argument('input_file')
 @click.option('-o', '--output_directory', required=False, type=str, default='')
-def cli(input_file, output_directory):
+@click.option('-k', '--kernel_size', required=False, type=int, default=1)
+def cli(input_file, output_directory, kernel_size):
+    print(f"Starting")
     start = time.time()
-    options = AnalysisOptions(input_file, output_directory)
+    options = AnalysisOptions(input_file=input_file, output_directory=output_directory, kernel_size=kernel_size)
 
     print(f"Analyzing image")
     result = process(options)
