@@ -6,8 +6,10 @@ import click
 import cv2
 import imageio
 import numpy as np
+import scipy.ndimage as ndi
 import skimage
 from skimage.morphology import medial_axis, skeletonize
+from skan import skeleton_to_csgraph
 
 import thresholding
 from options import AnalysisOptions
@@ -58,16 +60,6 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     dilated_image = cv2.dilate(inverted_image, kernel, iterations=1)
     cv2.imwrite(f"{output_prefix}.dilated.png", dilated_image)
 
-    # erode image
-    # print(f"Eroding")
-    # eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
-    # cv2.imwrite(f"{output_prefix}.eroded.png", eroded_image)
-
-    # close image
-    # print(f"Closing")
-    # closed_image = cv2.morphologyEx(inverted_image, cv2.MORPH_CLOSE, kernel)
-    # cv2.imwrite(f"{output_prefix}.closed.png", closed_image)
-
     # component labeling
     print(f"Finding connected components")
     num_labels, labels_image, stats, centroids = cv2.connectedComponentsWithStats(dilated_image)
@@ -100,18 +92,51 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     skeleton_image = skeletonize(largest_comp_image)
     cv2.imwrite(f"{output_prefix}.skeleton.png", skimage.img_as_uint(skeleton_image))
 
-    # find area, length, max height/width
+    # find branch points
+    # (referenced from https://stackoverflow.com/a/67129378/6514033)
+    # branch_points = np.zeros_like(skeleton_image, dtype=bool)
+    # elements = list()
+    # elements.append(np.array([[0, 1, 0], [1, 1, 1], [0, 0, 0]]))
+    # elements.append(np.array([[1, 0, 1], [0, 1, 0], [1, 0, 0]]))
+    # elements.append(np.array([[1, 0, 1], [0, 1, 0], [0, 1, 0]]))
+    # elements.append(np.array([[0, 1, 0], [1, 1, 0], [0, 0, 1]]))
+    # elements.append(np.array([[0, 0, 1], [1, 1, 1], [0, 1, 0]]))
+    # elements = [np.rot90(elements[i], k=j) for i in range(5) for j in range(4)]
+    # elements.append(np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]))
+    # elements.append(np.array([[1, 0, 1], [0, 1, 0], [1, 0, 1]]))
+    # for element in elements: branch_points |= ndi.binary_hit_or_miss(skeleton_image, element)
+    # cv2.imwrite(f"{output_prefix}.branchpts.png", branch_points.astype(float))
+
+    # find branch points
+    _, _, degrees = skeleton_to_csgraph(skeleton_image)
+    branch_points = degrees > 2
+    cv2.imwrite(f"{output_prefix}.branchpts.png", skimage.img_as_uint(branch_points))
+
+    # find end points
+    end_points = np.zeros_like(skeleton_image, dtype=bool)
+    elements = list()
+    elements.append(np.array([[0, 1, 0], [0, 1, 0], [0, 0, 0]]))
+    elements.append(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 0]]))
+    elements = [np.rot90(elements[i], k=j) for i in range(2) for j in range(4)]
+    for element in elements: end_points |= ndi.binary_hit_or_miss(skeleton_image, element)
+    cv2.imwrite(f"{output_prefix}.endpts.png", skimage.img_as_uint(end_points))
+
+    # find area, length, max height/width, number of branch/end points
     area = stats[max_label, cv2.CC_STAT_AREA]
     width = stats[max_label, cv2.CC_STAT_WIDTH]
     height = stats[max_label, cv2.CC_STAT_HEIGHT]
     length = int(np.sum(skeleton_image == 1))
+    branch_points = int(np.sum(branch_points == 1))
+    end_points = int(np.sum(end_points == 1))
 
     # print and return results
     print(f"Area: {area}")
     print(f"Width: {width}")
     print(f"Height: {height}")
     print(f"Length: {length}")
-    return AnalysisResult(name=options.input_name, area=area, width=width, height=height, length=length)
+    print(f"Branch points: {branch_points}")
+    print(f"End points: {end_points}")
+    return AnalysisResult(name=options.input_name, area=area, width=width, height=height, length=length, branch_points=branch_points, end_points=end_points)
 
 
 @click.command()

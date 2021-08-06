@@ -20,3 +20,5 @@ PyYAML==5.3.1
 pytest==6.2.1
 coverage==5.3.1
 coveralls==2.2.0
+skan==0.9
+numba==0.53.1
