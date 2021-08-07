@@ -8,5 +8,6 @@ class AnalysisResult(TypedDict, total=False):
     height: float
     length: int
     leaves: int
+    segments: int
     branchpts: int
     endpts: int

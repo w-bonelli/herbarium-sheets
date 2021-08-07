@@ -6,10 +6,7 @@ import click
 import cv2
 import imageio
 import numpy as np
-import scipy.ndimage as ndi
 import skimage
-from skimage.morphology import medial_axis, skeletonize
-from skan import skeleton_to_csgraph
 from plantcv import plantcv as pcv
 
 import thresholding
@@ -87,8 +84,8 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     # get pruned skeleton and find edge segments
     skeleton_image = pcv.morphology.skeletonize(mask=largest_comp_image)
     pruned_image, seg_img, edge_objects = pcv.morphology.prune(skel_img=skeleton_image, size=50)
-    cv2.imwrite(f"{output_prefix}.skeleton.pcv.png", skimage.img_as_uint(pruned_image))
-    cv2.imwrite(f"{output_prefix}.skeleton.pcv.seg.png", skimage.img_as_uint(seg_img))
+    cv2.imwrite(f"{output_prefix}.skeleton.png", skimage.img_as_uint(pruned_image))
+    cv2.imwrite(f"{output_prefix}.segments.png", skimage.img_as_uint(seg_img))
 
     # find branch points
     branchpts_image = pcv.morphology.find_branch_pts(skel_img=pruned_image)
@@ -98,11 +95,15 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     endpts_image = pcv.morphology.find_tips(skel_img=pruned_image)
     cv2.imwrite(f"{output_prefix}.endpts.png", skimage.img_as_uint(endpts_image))
 
+    # sort stem and leaves
+    leaf_objects, stem_objects = pcv.morphology.segment_sort(skel_img=pruned_image, objects=edge_objects)
+
     # find area, length, max height/width, number of branch/end points
     area = stats[max_label, cv2.CC_STAT_AREA]
     width = stats[max_label, cv2.CC_STAT_WIDTH]
     height = stats[max_label, cv2.CC_STAT_HEIGHT]
-    length = int(np.sum(skeleton_image == 1))
+    length = int(np.sum(skeleton_image != 0))
+    leaves = len(leaf_objects)
     segments = len(edge_objects)
     branchpts = int(np.sum(branchpts_image != 0))
     endpts = int(np.sum(endpts_image != 0))
@@ -113,10 +114,11 @@ def process(options: AnalysisOptions) -> AnalysisResult:
     print(f"Width: {width}")
     print(f"Height: {height}")
     print(f"Length: {length}")
-    print(f"Segments: {segments}")
-    print(f"Branchpoints: {branchpts}")
-    print(f"Endpoints: {endpts}")
-    return AnalysisResult(name=options.input_name, area=area, width=width, height=height, length=length, branchpts=branchpts, endpts=endpts)
+    print(f"Leaves: {leaves}")
+    print(f"Stem segments: {segments}")
+    print(f"Branch points: {branchpts}")
+    print(f"End points: {endpts}")
+    return AnalysisResult(name=options.input_name, area=area, width=width, height=height, length=length, leaves=leaves, segments=segments, branchpts=branchpts, endpts=endpts)
 
 
 @click.command()
