@@ -8,5 +8,5 @@ class AnalysisResult(TypedDict, total=False):
     height: float
     length: int
     leaves: int
-    branch_points: int
-    end_points: int
+    branchpts: int
+    endpts: int
