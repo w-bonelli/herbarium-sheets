@@ -4,7 +4,9 @@ Extract geometric trait measurements from scans or images of herbarium sheets.
 
 ## Acknowledgements
 
-Segmentation approach inspired by Suxing Liu, in particular [Smart Plant Growth Top-Down Traits](https://github.com/Computational-Plant-Science/spg).
+General approach inspired by Suxing Liu, in particular [Smart Plant Growth Top-Down Traits](https://github.com/Computational-Plant-Science/spg).
+
+[PlantCV](https://github.com/danforthcenter/plantcv) also used for skeletonization, pruning, leaf & stem counting, etc.
 
 ## Requirements
 
